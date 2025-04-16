@@ -27,50 +27,48 @@ if (!fs.existsSync(DEVIS_FILE)) {
 }
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['https://website-lusciana-frontend.vercel.app', 'http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 app.use(bodyParser.json());
 
 // Middleware de logging
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
     next();
 });
 
 // Middleware d'authentification
 const checkAuth = (req, res, next) => {
-    // Vérifier d'abord les en-têtes
-    let userEmail = req.headers['x-user-email'];
-    let userPseudo = req.headers['x-user-pseudo'];
+    const authHeader = req.headers['authorization'];
     
-    // Journaliser la requête pour debug
-    console.log(`Requête reçue pour ${req.path}`, {
-        headers: req.headers,
-        body: req.body
-    });
-    
-    // Exception INCONDITIONNELLE pour bug-report.html et devis.html
-    if (req.path === '/bug-report.html' || req.path === '/devis.html' || req.path === '/' || req.path === '/index.html') {
-        console.log(`Accès direct autorisé à ${req.path}`);
-        return next();
+    if (!authHeader) {
+        console.log('Erreur: Token d\'authentification manquant');
+        return res.status(401).json({ 
+            error: 'Non authentifié',
+            details: 'Token d\'authentification manquant'
+        });
     }
     
-    // Si les en-têtes ne sont pas présents, vérifier dans les cookies ou localStorage via la session
-    if (!userEmail && !userPseudo) {
-        console.log("Headers d'authentification manquants, tentative via autre méthode");
-        
-        // Si l'utilisateur n'est pas authentifié, rediriger vers la page de connexion
-        if (req.path.startsWith('/api/')) {
+    // Pour les routes API, vérifier l'authentification
+    if (req.path.startsWith('/api/')) {
+        if (!authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ 
                 error: 'Non authentifié',
-                details: 'Les headers x-user-email et x-user-pseudo sont manquants'
+                details: 'Format de token invalide'
             });
-        } else {
-            return res.redirect('/login.html');
         }
+        // Ici, vous devriez vérifier le token JWT
+        // Pour l'instant, on accepte simplement le token
+        next();
+    } else {
+        next();
     }
-    
-    console.log(`Utilisateur authentifié: ${userEmail}, ${userPseudo}`);
-    next();
 };
 
 // Fonction pour lire les devis
@@ -190,17 +188,18 @@ app.post('/api/bug-report', (req, res) => {
 });
 
 // Routes pour les devis
-app.post('/api/devis', (req, res) => {
+app.post('/api/devis', checkAuth, (req, res) => {
     console.log('Requête POST reçue pour /api/devis:', req.body);
     console.log('Headers reçus:', req.headers);
-    const userEmail = req.headers['x-user-email'];
-    const userPseudo = req.headers['x-user-pseudo'];
 
-    if (!userEmail || !userPseudo) {
-        console.log('Erreur: Utilisateur non connecté - Email:', userEmail, 'Pseudo:', userPseudo);
-        return res.status(401).json({ 
-            error: 'Utilisateur non connecté',
-            details: 'Les headers x-user-email et x-user-pseudo sont manquants'
+    // Validation des données requises
+    const requiredFields = ['type', 'exclusivite', 'organiques', 'terraforming', 'painting', 'eau', 'arbres'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    
+    if (missingFields.length > 0) {
+        return res.status(400).json({
+            error: 'Données manquantes',
+            details: `Les champs suivants sont requis: ${missingFields.join(', ')}`
         });
     }
 
@@ -209,8 +208,6 @@ app.post('/api/devis', (req, res) => {
         const newDevis = {
             id: Date.now().toString(),
             ...req.body,
-            userEmail,
-            userPseudo,
             date: new Date().toISOString(),
             status: 'En attente'
         };
@@ -219,7 +216,10 @@ app.post('/api/devis', (req, res) => {
         saveDevis(devis);
         console.log('Devis sauvegardé avec succès:', newDevis);
 
-        res.json({ message: 'Devis soumis avec succès', devis: newDevis });
+        res.json({ 
+            message: 'Devis soumis avec succès', 
+            devis: newDevis 
+        });
     } catch (error) {
         console.error('Erreur lors de la sauvegarde du devis:', error);
         res.status(500).json({ 
