@@ -44,10 +44,8 @@ const checkAuth = (req, res, next) => {
     
     // Journaliser la requête pour debug
     console.log(`Requête reçue pour ${req.path}`, {
-        headers: { 
-            'x-user-email': userEmail, 
-            'x-user-pseudo': userPseudo 
-        }
+        headers: req.headers,
+        body: req.body
     });
     
     // Exception INCONDITIONNELLE pour bug-report.html et devis.html
@@ -62,7 +60,10 @@ const checkAuth = (req, res, next) => {
         
         // Si l'utilisateur n'est pas authentifié, rediriger vers la page de connexion
         if (req.path.startsWith('/api/')) {
-            return res.status(401).json({ error: 'Non authentifié' });
+            return res.status(401).json({ 
+                error: 'Non authentifié',
+                details: 'Les headers x-user-email et x-user-pseudo sont manquants'
+            });
         } else {
             return res.redirect('/login.html');
         }
@@ -191,27 +192,41 @@ app.post('/api/bug-report', (req, res) => {
 // Routes pour les devis
 app.post('/api/devis', (req, res) => {
     console.log('Requête POST reçue pour /api/devis:', req.body);
+    console.log('Headers reçus:', req.headers);
     const userEmail = req.headers['x-user-email'];
     const userPseudo = req.headers['x-user-pseudo'];
 
     if (!userEmail || !userPseudo) {
-        return res.status(401).json({ error: 'Utilisateur non connecté' });
+        console.log('Erreur: Utilisateur non connecté - Email:', userEmail, 'Pseudo:', userPseudo);
+        return res.status(401).json({ 
+            error: 'Utilisateur non connecté',
+            details: 'Les headers x-user-email et x-user-pseudo sont manquants'
+        });
     }
 
-    const devis = readDevis();
-    const newDevis = {
-        id: Date.now().toString(),
-        ...req.body,
-        userEmail,
-        userPseudo,
-        date: new Date().toISOString(),
-        status: 'En attente'
-    };
+    try {
+        const devis = readDevis();
+        const newDevis = {
+            id: Date.now().toString(),
+            ...req.body,
+            userEmail,
+            userPseudo,
+            date: new Date().toISOString(),
+            status: 'En attente'
+        };
 
-    devis.devis.push(newDevis);
-    saveDevis(devis);
+        devis.devis.push(newDevis);
+        saveDevis(devis);
+        console.log('Devis sauvegardé avec succès:', newDevis);
 
-    res.json({ message: 'Devis soumis avec succès', devis: newDevis });
+        res.json({ message: 'Devis soumis avec succès', devis: newDevis });
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde du devis:', error);
+        res.status(500).json({ 
+            error: 'Erreur serveur lors de la sauvegarde du devis',
+            details: error.message 
+        });
+    }
 });
 
 app.get('/api/devis', checkAuth, (req, res) => {
