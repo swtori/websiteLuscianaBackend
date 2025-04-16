@@ -1,0 +1,25 @@
+{
+  "devis": [
+    {
+      "id": "1744823741344",
+      "exclusivite": "oui",
+      "organiques": "oui",
+      "organiques_grand": "4",
+      "organiques_petit": "5",
+      "organiques_tres_petit": "6",
+      "terraforming": "oui",
+      "painting": "oui",
+      "eau": "fausse",
+      "arbres": "homemade",
+      "type": [
+        "interieur"
+      ],
+      "jours": "6",
+      "besoins": "je sais pas trop en faite",
+      "userEmail": "coraline@gmail.com",
+      "userPseudo": "Corqline",
+      "date": "2025-04-16T17:15:41.344Z",
+      "status": "En attente"
+    }
+  ]
+}
