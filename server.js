@@ -28,7 +28,7 @@ if (!fs.existsSync(DEVIS_FILE)) {
 
 // Middleware
 app.use(cors({
-    origin: ['https://website-lusciana-frontend.vercel.app', 'http://localhost:3000'],
+    origin: ['https://lusciana-build-team.vercel.app', 'https://website-lusciana-frontend.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
