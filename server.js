@@ -10,10 +10,6 @@ const PORT = process.env.PORT || 3000;
 // Initialisation des fichiers JSON
 const USERS_FILE = 'users.json';
 const BUGS_FILE = 'bugs.json';
-const DEVIS_FILE = 'devis.json';
-
-// Chemin vers le fichier des devis
-const devisPath = path.join(__dirname, 'devis.json');
 
 // Créer les fichiers s'ils n'existent pas
 if (!fs.existsSync(USERS_FILE)) {
@@ -21,9 +17,6 @@ if (!fs.existsSync(USERS_FILE)) {
 }
 if (!fs.existsSync(BUGS_FILE)) {
     fs.writeFileSync(BUGS_FILE, JSON.stringify({ bugs: [] }, null, 2));
-}
-if (!fs.existsSync(DEVIS_FILE)) {
-    fs.writeFileSync(DEVIS_FILE, JSON.stringify({ devis: [] }, null, 2));
 }
 
 // Middleware
@@ -70,21 +63,6 @@ const checkAuth = (req, res, next) => {
         next();
     }
 };
-
-// Fonction pour lire les devis
-function readDevis() {
-    try {
-        const data = fs.readFileSync(devisPath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        return { devis: [] };
-    }
-}
-
-// Fonction pour sauvegarder les devis
-function saveDevis(devis) {
-    fs.writeFileSync(devisPath, JSON.stringify(devis, null, 2));
-}
 
 // Routes API
 app.post('/api/signup', (req, res) => {
@@ -187,7 +165,7 @@ app.post('/api/bug-report', (req, res) => {
     }
 });
 
-// Routes pour les devis
+// Route pour le devis
 app.post('/api/devis', checkAuth, (req, res) => {
     console.log('Requête POST reçue pour /api/devis:', req.body);
     console.log('Headers reçus:', req.headers);
@@ -204,44 +182,43 @@ app.post('/api/devis', checkAuth, (req, res) => {
     }
 
     try {
-        const devis = readDevis();
-        const newDevis = {
-            id: Date.now().toString(),
-            ...req.body,
-            date: new Date().toISOString(),
-            status: 'En attente'
-        };
-
-        devis.devis.push(newDevis);
-        saveDevis(devis);
-        console.log('Devis sauvegardé avec succès:', newDevis);
-
+        // Calculer le prix total
+        const prixTotal = calculateTotalPrice(req.body);
+        
         res.json({ 
-            message: 'Devis soumis avec succès', 
-            devis: newDevis 
+            message: 'Devis calculé avec succès', 
+            prixTotal: prixTotal
         });
     } catch (error) {
-        console.error('Erreur lors de la sauvegarde du devis:', error);
+        console.error('Erreur lors du calcul du devis:', error);
         res.status(500).json({ 
-            error: 'Erreur serveur lors de la sauvegarde du devis',
+            error: 'Erreur serveur lors du calcul du devis',
             details: error.message 
         });
     }
 });
 
-app.get('/api/devis', checkAuth, (req, res) => {
-    console.log('Requête GET reçue pour /api/devis');
-    const userEmail = req.headers['x-user-email'];
-    const userPseudo = req.headers['x-user-pseudo'];
-
-    if (!userEmail || !userPseudo) {
-        return res.status(401).json({ error: 'Utilisateur non connecté' });
+// Fonction pour calculer le prix total
+function calculateTotalPrice(devisData) {
+    let total = 0;
+    
+    // Prix de base selon le type
+    if (devisData.type === 'standard') {
+        total += 1000;
+    } else if (devisData.type === 'premium') {
+        total += 2000;
     }
-
-    const devis = readDevis();
-    const userDevis = devis.devis.filter(d => d.userEmail === userEmail);
-    res.json(userDevis);
-});
+    
+    // Ajout des options
+    if (devisData.exclusivite) total += 500;
+    if (devisData.organiques) total += 300;
+    if (devisData.terraforming) total += 400;
+    if (devisData.painting) total += 200;
+    if (devisData.eau) total += 600;
+    if (devisData.arbres) total += 400;
+    
+    return total;
+}
 
 // Routes pour les pages
 app.get('/', (req, res) => {
