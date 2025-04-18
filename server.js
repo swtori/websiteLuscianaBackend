@@ -68,7 +68,7 @@ const checkAuth = (req, res, next) => {
 const checkAdmin = (req, res, next) => {
     const adminPassword = req.headers['x-admin-password'];
     
-    if (!adminPassword || adminPassword !== 'votre_mot_de_passe_admin') {
+    if (!adminPassword || adminPassword !== 'admin123') {
         return res.status(401).json({ 
             error: 'Non autorisé',
             details: 'Accès admin requis'
