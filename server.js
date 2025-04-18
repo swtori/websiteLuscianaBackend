@@ -23,7 +23,7 @@ if (!fs.existsSync(BUGS_FILE)) {
 app.use(cors({
     origin: ['https://lusciana-build-team.vercel.app', 'https://website-lusciana-frontend.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
     credentials: true
 }));
 app.use(bodyParser.json());
