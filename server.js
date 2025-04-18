@@ -64,6 +64,19 @@ const checkAuth = (req, res, next) => {
     }
 };
 
+// Middleware de vérification admin
+const checkAdmin = (req, res, next) => {
+    const adminPassword = req.headers['x-admin-password'];
+    
+    if (!adminPassword || adminPassword !== 'votre_mot_de_passe_admin') {
+        return res.status(401).json({ 
+            error: 'Non autorisé',
+            details: 'Accès admin requis'
+        });
+    }
+    next();
+};
+
 // Routes API
 app.post('/api/signup', (req, res) => {
     console.log('Requête d\'inscription reçue:', req.body);
@@ -255,6 +268,17 @@ app.get('/bug-report.html', (req, res) => {
 app.get('/devis.html', (req, res) => {
     console.log('Route spéciale devis appelée sans vérification');
     res.sendFile(path.join(__dirname, 'public', 'devis.html'));
+});
+
+// Route pour récupérer les signalements de bugs (protégée par authentification admin)
+app.get('/api/bugs', checkAdmin, (req, res) => {
+    try {
+        const data = JSON.parse(fs.readFileSync(BUGS_FILE, 'utf8'));
+        res.json(data);
+    } catch (err) {
+        console.error("Erreur lors de la récupération des bugs:", err);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
 });
 
 // Route générique pour les autres requêtes
