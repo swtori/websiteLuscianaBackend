@@ -2,21 +2,59 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const { Octokit } = require('@octokit/rest');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialisation des fichiers JSON
-const USERS_FILE = 'users.json';
-const BUGS_FILE = 'bugs.json';
+// Configuration GitHub
+const octokit = new Octokit({
+    auth: process.env.GITHUB_TOKEN
+});
 
-// Créer les fichiers s'ils n'existent pas
-if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify({ users: [] }, null, 2));
+const GITHUB_OWNER = process.env.GITHUB_OWNER;
+const GITHUB_REPO = process.env.GITHUB_REPO;
+
+// Fonctions pour gérer les données sur GitHub
+async function getFileContent(fileName) {
+    try {
+        const response = await octokit.repos.getContent({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            path: fileName
+        });
+        return {
+            content: JSON.parse(Buffer.from(response.data.content, 'base64').toString()),
+            sha: response.data.sha
+        };
+    } catch (error) {
+        if (error.status === 404) {
+            return { content: { users: [] }, sha: null };
+        }
+        throw error;
+    }
 }
-if (!fs.existsSync(BUGS_FILE)) {
-    fs.writeFileSync(BUGS_FILE, JSON.stringify({ bugs: [] }, null, 2));
+
+async function updateFileContent(fileName, content) {
+    try {
+        const { content: currentContent, sha } = await getFileContent(fileName);
+        const newContent = JSON.stringify(content, null, 2);
+        
+        await octokit.repos.createOrUpdateFileContents({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            path: fileName,
+            message: `Update ${fileName}`,
+            content: Buffer.from(newContent).toString('base64'),
+            sha: sha
+        });
+        
+        console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub`);
+    } catch (error) {
+        console.error(`Erreur lors de la mise à jour de ${fileName}:`, error);
+        throw error;
+    }
 }
 
 // Middleware
@@ -26,6 +64,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
     credentials: true
 }));
+
 app.use(bodyParser.json());
 
 // Middleware de logging
@@ -78,35 +117,31 @@ const checkAdmin = (req, res, next) => {
 };
 
 // Routes API
-app.post('/api/signup', (req, res) => {
+app.post('/api/signup', async (req, res) => {
     console.log('Requête d\'inscription reçue:', req.body);
     const { email, pseudo, password } = req.body;
 
     try {
-        const data = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        const { content: data } = await getFileContent('users.json');
         const users = data.users;
         
-        // Vérifier si l'email existe déjà
         if (users.some(user => user.email === email)) {
             return res.status(400).json({ error: 'Cet email est déjà utilisé' });
         }
 
-        // Vérifier si le pseudo existe déjà
         if (users.some(user => user.pseudo === pseudo)) {
             return res.status(400).json({ error: 'Ce pseudo est déjà utilisé' });
         }
 
-        // Créer le nouvel utilisateur
         const newUser = {
             id: Date.now().toString(),
             email,
             pseudo,
-            password // Note: En production, il faudrait hasher le mot de passe
+            password
         };
 
-        // Ajouter le nouvel utilisateur
         users.push(newUser);
-        fs.writeFileSync(USERS_FILE, JSON.stringify({ users }, null, 2));
+        await updateFileContent('users.json', { users });
 
         res.status(201).json({ message: 'Compte créé avec succès' });
     } catch (err) {
@@ -115,12 +150,12 @@ app.post('/api/signup', (req, res) => {
     }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
     console.log('Requête de connexion reçue:', req.body);
     const { email, password } = req.body;
 
     try {
-        const data = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        const { content: data } = await getFileContent('users.json');
         const users = data.users;
         const user = users.find(u => u.email === email && u.password === password);
 
@@ -142,7 +177,7 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-app.post('/api/bug-report', (req, res) => {
+app.post('/api/bug-report', async (req, res) => {
     console.log('Requête de signalement de bug reçue:', req.body);
     const { category, description, email, pseudo } = req.body;
 
@@ -151,10 +186,9 @@ app.post('/api/bug-report', (req, res) => {
     }
 
     try {
-        const data = JSON.parse(fs.readFileSync(BUGS_FILE, 'utf8'));
-        const bugs = data.bugs;
+        const { content: data } = await getFileContent('bugs.json');
+        const bugs = data.bugs || [];
         
-        // Créer le nouveau signalement
         const newBug = {
             id: Date.now().toString(),
             category,
@@ -167,9 +201,8 @@ app.post('/api/bug-report', (req, res) => {
             }
         };
 
-        // Ajouter le nouveau signalement
         bugs.push(newBug);
-        fs.writeFileSync(BUGS_FILE, JSON.stringify({ bugs }, null, 2));
+        await updateFileContent('bugs.json', { bugs });
 
         res.status(201).json({ message: 'Signalement envoyé avec succès' });
     } catch (err) {
@@ -271,9 +304,9 @@ app.get('/devis.html', (req, res) => {
 });
 
 // Route pour récupérer les signalements de bugs (protégée par authentification admin)
-app.get('/api/bugs', checkAdmin, (req, res) => {
+app.get('/api/bugs', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(BUGS_FILE, 'utf8'));
+        const { content: data } = await getFileContent('bugs.json');
         res.json(data);
     } catch (err) {
         console.error("Erreur lors de la récupération des bugs:", err);
