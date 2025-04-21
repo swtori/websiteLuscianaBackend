@@ -268,7 +268,18 @@ app.post('/api/devis', async (req, res) => {
     console.log('Headers reçus:', req.headers);
 
     // Validation des données requises
-    const requiredFields = ['type', 'exclusivite', 'organiques', 'terraforming', 'painting', 'eau', 'arbres'];
+    const requiredFields = [
+        'buildSize',
+        'type',
+        'exclusivite',
+        'organiques',
+        'terraforming',
+        'painting',
+        'eau',
+        'arbres',
+        'besoins',
+        'date'
+    ];
     const missingFields = requiredFields.filter(field => !req.body[field]);
     
     if (missingFields.length > 0) {
@@ -294,10 +305,20 @@ app.post('/api/devis', async (req, res) => {
         // Ajouter le nouveau devis
         const newDevis = {
             id: Date.now().toString(),
-            ...req.body,
+            buildSize: parseInt(req.body.buildSize),
+            type: req.body.type,
+            exclusivite: req.body.exclusivite === 'oui',
+            organiques: req.body.organiques === 'oui',
+            terraforming: req.body.terraforming === 'oui',
+            painting: req.body.painting === 'oui',
+            eau: req.body.eau,
+            arbres: req.body.arbres,
+            besoins: req.body.besoins,
+            date: req.body.date,
             prixTotal,
-            date: new Date().toISOString()
+            dateCreation: new Date().toISOString()
         };
+        
         console.log('Nouveau devis à ajouter:', newDevis);
         
         devis.push(newDevis);
@@ -341,6 +362,15 @@ function calculateTotalPrice(devisData) {
     if (devisData.painting) total += 200;
     if (devisData.eau) total += 600;
     if (devisData.arbres) total += 400;
+    
+    // Calcul du prix en fonction de la taille
+    const buildSize = parseInt(devisData.buildSize);
+    if (buildSize > 0) {
+        // Prix de base par bloc
+        const prixParBloc = 0.1; // 0.10€ par bloc
+        const nombreDeBlocs = buildSize * buildSize; // Surface en blocs
+        total += nombreDeBlocs * prixParBloc;
+    }
     
     return total;
 }
