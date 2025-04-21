@@ -16,9 +16,19 @@ const octokit = new Octokit({
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
 
+// Vérification de la configuration GitHub
+console.log('Configuration GitHub:');
+console.log('Owner:', GITHUB_OWNER);
+console.log('Repo:', GITHUB_REPO);
+console.log('Token présent:', !!process.env.GITHUB_TOKEN);
+
 // Fonctions pour gérer les données sur GitHub
 async function getFileContent(fileName) {
     try {
+        if (!GITHUB_OWNER || !GITHUB_REPO) {
+            throw new Error('Configuration GitHub manquante');
+        }
+
         console.log('Tentative de récupération du fichier depuis GitHub...');
         console.log('Owner:', GITHUB_OWNER);
         console.log('Repo:', GITHUB_REPO);
@@ -30,13 +40,15 @@ async function getFileContent(fileName) {
             path: fileName
         });
         
-        console.log('Réponse GitHub reçue');
+        console.log('Réponse GitHub reçue:', response.status);
         return {
             content: JSON.parse(Buffer.from(response.data.content, 'base64').toString()),
             sha: response.data.sha
         };
     } catch (error) {
-        console.error('Erreur lors de la récupération du fichier:', error);
+        console.error('Erreur détaillée lors de la récupération du fichier:', error);
+        console.error('Status:', error.status);
+        console.error('Message:', error.message);
         if (error.status === 404) {
             console.log('Fichier non trouvé, création d\'un nouveau fichier');
             return { content: { bugs: [] }, sha: null };
@@ -51,6 +63,10 @@ async function getFileContent(fileName) {
 
 async function updateFileContent(fileName, content) {
     try {
+        if (!GITHUB_OWNER || !GITHUB_REPO) {
+            throw new Error('Configuration GitHub manquante');
+        }
+
         console.log('Tentative de mise à jour du fichier sur GitHub...');
         const { content: currentContent, sha } = await getFileContent(fileName);
         const newContent = JSON.stringify(content, null, 2);
@@ -58,7 +74,7 @@ async function updateFileContent(fileName, content) {
         console.log('Contenu à mettre à jour:', newContent);
         console.log('SHA actuel:', sha);
         
-        await octokit.repos.createOrUpdateFileContents({
+        const response = await octokit.repos.createOrUpdateFileContents({
             owner: GITHUB_OWNER,
             repo: GITHUB_REPO,
             path: fileName,
@@ -67,9 +83,11 @@ async function updateFileContent(fileName, content) {
             sha: sha
         });
         
-        console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub`);
+        console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub:`, response.status);
     } catch (error) {
         console.error(`Erreur détaillée lors de la mise à jour de ${fileName}:`, error);
+        console.error('Status:', error.status);
+        console.error('Message:', error.message);
         if (error.status === 401) {
             console.error('Erreur d\'authentification GitHub. Vérifiez le token.');
             throw new Error('Erreur d\'authentification GitHub. Vérifiez le token.');
