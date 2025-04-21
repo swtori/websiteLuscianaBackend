@@ -19,18 +19,31 @@ const GITHUB_REPO = process.env.GITHUB_REPO;
 // Fonctions pour gérer les données sur GitHub
 async function getFileContent(fileName) {
     try {
+        console.log('Tentative de récupération du fichier depuis GitHub...');
+        console.log('Owner:', GITHUB_OWNER);
+        console.log('Repo:', GITHUB_REPO);
+        console.log('Path:', fileName);
+        
         const response = await octokit.repos.getContent({
             owner: GITHUB_OWNER,
             repo: GITHUB_REPO,
             path: fileName
         });
+        
+        console.log('Réponse GitHub reçue');
         return {
             content: JSON.parse(Buffer.from(response.data.content, 'base64').toString()),
             sha: response.data.sha
         };
     } catch (error) {
+        console.error('Erreur lors de la récupération du fichier:', error);
         if (error.status === 404) {
-            return { content: { users: [] }, sha: null };
+            console.log('Fichier non trouvé, création d\'un nouveau fichier');
+            return { content: { bugs: [] }, sha: null };
+        }
+        if (error.status === 401) {
+            console.error('Erreur d\'authentification GitHub. Vérifiez le token.');
+            throw new Error('Erreur d\'authentification GitHub. Vérifiez le token.');
         }
         throw error;
     }
@@ -38,8 +51,12 @@ async function getFileContent(fileName) {
 
 async function updateFileContent(fileName, content) {
     try {
+        console.log('Tentative de mise à jour du fichier sur GitHub...');
         const { content: currentContent, sha } = await getFileContent(fileName);
         const newContent = JSON.stringify(content, null, 2);
+        
+        console.log('Contenu à mettre à jour:', newContent);
+        console.log('SHA actuel:', sha);
         
         await octokit.repos.createOrUpdateFileContents({
             owner: GITHUB_OWNER,
@@ -52,7 +69,11 @@ async function updateFileContent(fileName, content) {
         
         console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub`);
     } catch (error) {
-        console.error(`Erreur lors de la mise à jour de ${fileName}:`, error);
+        console.error(`Erreur détaillée lors de la mise à jour de ${fileName}:`, error);
+        if (error.status === 401) {
+            console.error('Erreur d\'authentification GitHub. Vérifiez le token.');
+            throw new Error('Erreur d\'authentification GitHub. Vérifiez le token.');
+        }
         throw error;
     }
 }
@@ -186,8 +207,12 @@ app.post('/api/bug-report', async (req, res) => {
     }
 
     try {
+        console.log('Tentative de récupération du fichier bugs.json...');
         const { content: data } = await getFileContent('bugs.json');
+        console.log('Contenu récupéré:', data);
+        
         const bugs = data.bugs || [];
+        console.log('Bugs actuels:', bugs);
         
         const newBug = {
             id: Date.now().toString(),
@@ -202,12 +227,20 @@ app.post('/api/bug-report', async (req, res) => {
         };
 
         bugs.push(newBug);
+        console.log('Nouveau bug à ajouter:', newBug);
+        
         await updateFileContent('bugs.json', { bugs });
+        console.log('Fichier bugs.json mis à jour avec succès');
 
         res.status(201).json({ message: 'Signalement envoyé avec succès' });
     } catch (err) {
-        console.error("Erreur lors du signalement de bug:", err);
-        res.status(500).json({ error: 'Erreur serveur' });
+        console.error("Erreur détaillée lors du signalement de bug:", err);
+        console.error("Message d'erreur:", err.message);
+        console.error("Stack trace:", err.stack);
+        res.status(500).json({ 
+            error: 'Erreur serveur',
+            details: err.message 
+        });
     }
 });
 
