@@ -263,7 +263,7 @@ app.post('/api/bug-report', async (req, res) => {
 });
 
 // Route pour le devis
-app.post('/api/devis', checkAuth, (req, res) => {
+app.post('/api/devis', checkAuth, async (req, res) => {
     console.log('Requête POST reçue pour /api/devis:', req.body);
     console.log('Headers reçus:', req.headers);
 
@@ -282,12 +282,30 @@ app.post('/api/devis', checkAuth, (req, res) => {
         // Calculer le prix total
         const prixTotal = calculateTotalPrice(req.body);
         
+        // Récupérer les devis existants
+        const { content: data } = await getFileContent('devis.json');
+        const devis = data.devis || [];
+        
+        // Ajouter le nouveau devis
+        const newDevis = {
+            id: Date.now().toString(),
+            ...req.body,
+            prixTotal,
+            date: new Date().toISOString()
+        };
+        
+        devis.push(newDevis);
+        
+        // Sauvegarder sur GitHub
+        await updateFileContent('devis.json', { devis });
+        
         res.json({ 
-            message: 'Devis calculé avec succès', 
-            prixTotal: prixTotal
+            message: 'Devis calculé et sauvegardé avec succès', 
+            prixTotal: prixTotal,
+            devisId: newDevis.id
         });
     } catch (error) {
-        console.error('Erreur lors du calcul du devis:', error);
+        console.error('Erreur lors du calcul et de la sauvegarde du devis:', error);
         res.status(500).json({ 
             error: 'Erreur serveur lors du calcul du devis',
             details: error.message 
