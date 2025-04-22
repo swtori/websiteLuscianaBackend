@@ -68,22 +68,42 @@ async function updateFileContent(fileName, content) {
         }
 
         console.log('Tentative de mise à jour du fichier sur GitHub...');
-        const { content: currentContent, sha } = await getFileContent(fileName);
-        const newContent = JSON.stringify(content, null, 2);
-        
-        console.log('Contenu à mettre à jour:', newContent);
-        console.log('SHA actuel:', sha);
-        
-        const response = await octokit.repos.createOrUpdateFileContents({
-            owner: GITHUB_OWNER,
-            repo: GITHUB_REPO,
-            path: fileName,
-            message: `Update ${fileName}`,
-            content: Buffer.from(newContent).toString('base64'),
-            sha: sha
-        });
-        
-        console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub:`, response.status);
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (retryCount < maxRetries) {
+            try {
+                const { content: currentContent, sha } = await getFileContent(fileName);
+                const newContent = JSON.stringify(content, null, 2);
+                
+                console.log('Contenu à mettre à jour:', newContent);
+                console.log('SHA actuel:', sha);
+                
+                const response = await octokit.repos.createOrUpdateFileContents({
+                    owner: GITHUB_OWNER,
+                    repo: GITHUB_REPO,
+                    path: fileName,
+                    message: `Update ${fileName}`,
+                    content: Buffer.from(newContent).toString('base64'),
+                    sha: sha
+                });
+                
+                console.log(`Fichier ${fileName} mis à jour avec succès sur GitHub:`, response.status);
+                return;
+            } catch (error) {
+                if (error.status === 409 && error.message.includes('SHA')) {
+                    console.log(`Conflit de SHA détecté, tentative ${retryCount + 1}/${maxRetries}`);
+                    retryCount++;
+                    if (retryCount === maxRetries) {
+                        throw new Error('Impossible de mettre à jour le fichier après plusieurs tentatives');
+                    }
+                    // Attendre un peu avant de réessayer
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                    throw error;
+                }
+            }
+        }
     } catch (error) {
         console.error(`Erreur détaillée lors de la mise à jour de ${fileName}:`, error);
         console.error('Status:', error.status);
