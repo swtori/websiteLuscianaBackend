@@ -98,9 +98,9 @@ async function updateFileContent(fileName, content) {
 
 // Middleware
 app.use(cors({
-    origin: ['https://lusciana-build-team.vercel.app', 'https://website-lusciana-frontend.vercel.app', 'http://localhost:3000'],
+    origin: ['https://lusciana-build-team.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
     credentials: true
 }));
 
