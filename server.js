@@ -443,6 +443,11 @@ app.get('/api/bugs', async (req, res) => {
     }
 });
 
+// Route de santé pour vérifier l'état du serveur
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 // Route générique pour les autres requêtes
 app.get('*', (req, res) => {
     const filePath = path.join(__dirname, 'public', req.url);
