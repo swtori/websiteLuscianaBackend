@@ -311,11 +311,6 @@ app.post('/api/devis', async (req, res) => {
     }
 
     try {
-        console.log('Calcul du prix total...');
-        // Calculer le prix total
-        const prixTotal = calculateTotalPrice(req.body);
-        console.log('Prix total calculé:', prixTotal);
-        
         console.log('Tentative de récupération des devis existants...');
         // Récupérer les devis existants
         const { content: data } = await getFileContent('devis.json');
@@ -335,7 +330,7 @@ app.post('/api/devis', async (req, res) => {
             arbres: req.body.arbres,
             besoins: req.body.besoins,
             date: req.body.date,
-            prixTotal,
+            status: 'en_attente',
             dateCreation: new Date().toISOString()
         };
         
@@ -349,51 +344,19 @@ app.post('/api/devis', async (req, res) => {
         console.log('Sauvegarde réussie');
         
         res.json({ 
-            message: 'Devis calculé et sauvegardé avec succès', 
-            prixTotal: prixTotal,
+            message: 'Devis sauvegardé avec succès', 
             devisId: newDevis.id
         });
     } catch (error) {
-        console.error('Erreur détaillée lors du calcul et de la sauvegarde du devis:', error);
+        console.error('Erreur détaillée lors de la sauvegarde du devis:', error);
         console.error('Message d\'erreur:', error.message);
         console.error('Stack trace:', error.stack);
         res.status(500).json({ 
-            error: 'Erreur serveur lors du calcul du devis',
+            error: 'Erreur serveur lors de la sauvegarde du devis',
             details: error.message 
         });
     }
 });
-
-// Fonction pour calculer le prix total
-function calculateTotalPrice(devisData) {
-    let total = 0;
-    
-    // Prix de base selon le type
-    if (devisData.type === 'standard') {
-        total += 1000;
-    } else if (devisData.type === 'premium') {
-        total += 2000;
-    }
-    
-    // Ajout des options
-    if (devisData.exclusivite) total += 500;
-    if (devisData.organiques) total += 300;
-    if (devisData.terraforming) total += 400;
-    if (devisData.painting) total += 200;
-    if (devisData.eau) total += 600;
-    if (devisData.arbres) total += 400;
-    
-    // Calcul du prix en fonction de la taille
-    const buildSize = parseInt(devisData.buildSize);
-    if (buildSize > 0) {
-        // Prix de base par bloc
-        const prixParBloc = 0.1; // 0.10€ par bloc
-        const nombreDeBlocs = buildSize * buildSize; // Surface en blocs
-        total += nombreDeBlocs * prixParBloc;
-    }
-    
-    return total;
-}
 
 // Routes pour les pages
 app.get('/', (req, res) => {
